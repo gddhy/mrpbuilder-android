@@ -1,0 +1,28 @@
+# Gradle / Android Studio
+.gradle/
+build/
+**/build/
+local.properties
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# 构建产物
+*.apk
+*.aab
+*.keystore
+*.jks
+dist/
+out/
+
+# 临时 / 日志
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# 说明：
+# - app/src/main/assets/toolchain/gcc.zip（约 25MB 内置工具链）必须提交，勿被上面的规则排除
+# - 本仓库根目录即 MrpBuilderAndroid/，dist/ 等交付目录位于仓库外

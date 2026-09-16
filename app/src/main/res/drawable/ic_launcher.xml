@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 终端风格图标：深绿圆角方块 + ">_" + 括号 -->
+    <path
+        android:fillColor="#1B5E20"
+        android:pathData="M18,6 L90,6 A12,12 0 0 1 102,18 L102,90 A12,12 0 0 1 90,102 L18,102 A12,12 0 0 1 6,90 L6,18 A12,12 0 0 1 18,6 Z" />
+    <path
+        android:fillColor="#FFB300"
+        android:pathData="M20,30 L44,54 L20,78 L14,72 L32,54 L14,36 Z" />
+    <path
+        android:fillColor="#A5D6A7"
+        android:pathData="M46,78 L88,78 L88,70 L46,70 Z" />
+    <path
+        android:fillColor="#FFB300"
+        android:pathData="M58,30 L88,30 L88,38 L58,38 Z" />
+</vector>

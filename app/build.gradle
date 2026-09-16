@@ -1,0 +1,46 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'net.gddhy.mrpbuilder'
+    compileSdk 32
+
+    defaultConfig {
+        applicationId "net.gddhy.mrpbuilder"
+        minSdk 24
+        // targetSdk 28：允许从应用私有目录直接执行解压出来的 gcc 二进制
+        // （Android 10+ 的 W^X 限制会禁止从 data 目录执行原生程序）
+        targetSdk 28
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    // 零第三方依赖：纯 framework Activity + 自研 FileProvider，
+    // 避免 androidx 版本要求高于服务端 compileSdk 32
+    aaptOptions {
+        noCompress "zip", "mr", "ext", "elf", "uc3", "png", "c", "h"
+    }
+
+    // targetSdk 28 是有意为之（允许执行私有目录内的 gcc），
+    // 该配置会触发 lint 的 ExpiredTargetSdkVersion 致命错误，故跳过 release lint
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+dependencies {
+}

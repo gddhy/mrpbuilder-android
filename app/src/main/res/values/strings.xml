@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MRP Builder</string>
+    <string name="toolchain_checking">正在检查工具链…</string>
+    <string name="toolchain_ready">工具链已就绪（arm-linux-androideabi-gcc）</string>
+    <string name="toolchain_missing">工具链尚未解压（首次编译时自动完成）</string>
+    <string name="pick_source">选择 .c 文件 / .zip 包</string>
+    <string name="pick_folder">选择文件夹（SAF 授权）</string>
+    <string name="load_demo">载入 Demo</string>
+    <string name="export_demo">导出 Demo</string>
+    <string name="section_source">工程来源</string>
+    <string name="section_project">当前工程</string>
+    <string name="section_build">构建</string>
+    <string name="section_log">日志</string>
+    <string name="compile">编译 bin.elf</string>
+    <string name="pack">打包 .mrp</string>
+    <string name="no_project">尚未导入工程</string>
+    <string name="pack_title">打包为 .mrp</string>
+    <string name="lbl_display">显示名</string>
+    <string name="lbl_filename">内部名（.mrp 文件名）</string>
+    <string name="lbl_appid">AppID</string>
+    <string name="lbl_version">版本</string>
+    <string name="lbl_vendor">开发者</string>
+    <string name="lbl_desc">介绍</string>
+    <string name="lbl_files">打包文件（前三项必选）</string>
+    <string name="cancel">取消</string>
+    <string name="do_pack">打包</string>
+    <string name="packed">打包成功</string>
+    <string name="save">保存到本地</string>
+    <string name="run_emulator">在模拟器中运行</string>
+    <string name="share">分享</string>
+    <string name="clear_log">清空</string>
+    <string name="copy_log">复制日志</string>
+    <string name="log_copied">已复制日志（%1$d 字符）</string>
+    <string name="no_error_log">日志为空</string>
+    <string name="must_compile_first">请先编译 bin.elf</string>
+    <string name="no_emulator">未找到可打开 .mrp 的应用，请先安装 MRP 模拟器（如 Mrpoid、iacMrp、vmrp 等）</string>
+    <string name="processing">处理中…</string>
+</resources>

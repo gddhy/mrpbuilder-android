@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.MrpBuilder" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">@color/primary</item>
+        <item name="android:colorPrimaryDark">@color/primary_dark</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:windowBackground">@color/bg</item>
+    </style>
+
+    <style name="MrpCard">
+        <item name="android:background">@drawable/bg_card</item>
+        <item name="android:padding">16dp</item>
+    </style>
+
+    <style name="MrpSectionTitle">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/primary</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">6dp</item>
+    </style>
+
+    <style name="MrpLog">
+        <item name="android:background">@color/log_bg</item>
+        <item name="android:textColor">@color/log_text</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:typeface">monospace</item>
+        <item name="android:padding">10dp</item>
+        <item name="android:lineSpacingExtra">1dp</item>
+    </style>
+</resources>

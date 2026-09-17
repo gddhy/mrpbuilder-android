@@ -62,7 +62,9 @@ gcc -o bin.elf <入口.c> <src/*.c> -I<头文件目录> \
 
 按工程自带的 mythroad 运行时情况自动检测，**只允许 gcc 工程编译**：
 
-**老 SDK 工程**是 ADS1.2 + SkySDK 时代（armcc）的项目
+**老 SDK 工程**是 ADS1.2 + SkySDK 时代（armcc）的项目，显著特征是包含 **SkySDK 工程配置文件
+`*.mpr`**（如 `MrpBuilder.mpr`，Skysdk 据此文件编译 mrp）；无 .mpr 但自带部分运行时
+（`mrc_graphics.c / uc3_font.c / xl_*` 等）而无 `_start` 的工程同样判定为老 SDK。
 导入后日志与界面会明确提示「不支持编译」，不进入编译流程。
 
 **入口文件选择**：入口弹窗与智能判断会跳过运行时实现文件（`mrc_*`、`xl_*`、`uc3_*`、
@@ -143,16 +145,60 @@ gcc -o bin.elf <入口.c> <src/*.c> -I<头文件目录> \
 > 注：APK 内规范文件以 ASCII 名（assets/gui_fan.md）存放，避免旧版 AAPT 对中文资产名的
 > 编码问题（GBK 字节导致 AssetManager 按 UTF-8 匹配失败）；导出 zip 时恢复中文名。
 
+## HTTP 编译服务（API / WebUI）
+
+主界面「API 编译服务」卡片点击 **启动编译服务**，App 在 `0.0.0.0:8111` 监听（本地 + 局域网）：
+端口被占用时提示「端口 8111 被占用，无法启用」。
+
+- **WebUI**：浏览器访问 `http://<手机IP>:8111/`，可视化提交 zip 工程 + 元信息 + 入口，实时看日志；
+- **接口文档**：`http://<手机IP>:8111/doc/`；
+- **技能文档**：`http://<手机IP>:8111/SKILL.md`（内含当前局域网 IP；手机走流量时局域网不可达，
+  改用 `127.0.0.1` 仅在手机本机访问）；
+- **接口**（均为 HTTP JSON）：
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/build` | multipart 提交 `file`(zip) + `display`/`fileName`/`appid`/`version`/`vendor`/`desc`/`entry` → `build_id` |
+| GET | `/api/build/{id}` | 查询状态 / 阶段 / 进度 / 错误 |
+| GET | `/api/build/{id}/log?offset=N` | 增量拉取编译日志 |
+| GET | `/api/build/{id}/artifact` | 下载打包好的 `.mrp` 产物 |
+| GET | `/api/demo` | 下载内置 demo 工程 zip |
+| GET | `/api/builds` | 最近 20 条构建 |
+
+```bash
+BASE=http://192.168.1.100:8111   # 换成手机局域网 IP
+curl -F "file=@demo.zip" -F "display=我的程序" -F "fileName=app.mrp" \
+     -F "appid=10001" -F "version=1" -F "vendor=MrpDev" -F "entry=main.c" \
+     $BASE/api/build
+# → {"build_id":"a1b2c3d4e5f6","status":"queued","urls":{...}}
+curl $BASE/api/build/a1b2c3d4e5f6            # 轮询到 status=success
+curl -OJ $BASE/api/build/a1b2c3d4e5f6/artifact  # 下载产物
+```
+
+- 元信息校验与 App 内打包一致：显示名非空、内部名英文且以 `.mrp` 结尾、AppID/版本/开发者非空；
+- **资源打包**：工程内全部资源（含 `assets/` 等**子目录**中的图片/音频等）默认一并打包进 mrp，
+  条目名保留相对路径；zip 条目名已做规范化（`\`→`/`、去前导 `./`），兼容 MT管理器等打包的压缩包；
+- 同一时刻串行执行 1 个编译任务（其余排队）；构建记录保留 3 天自动清理；
+- 无鉴权，仅供个人 / 局域网使用，**不要暴露到公网**；服务随 App 存活，被杀后需重新启动。
+
 ## 使用流程
 
 1. 安装 `app-release.apk`（本仓库 `dist/` 或构建产物）；
 2. 选择工程来源：
+   - **直接打开 zip 文件**：在文件管理器 / 浏览器里选择「用 MRP Builder 打开」一个 `.zip`，
+     应用会自动解压到私有目录并准备编译任务（等同于下面「选择 .zip 包」导入，已关联
+     `application/zip` / `application/x-zip-compressed` / `*.zip` 路径）；
    - **选择 .c 文件 / .zip 包**：单个源码文件（自动附加内置运行时库）或完整工程 zip
      （含 `settings.gradle` 之外的标准 gcc 工程：`入口.c + src/*.c + 头文件 + 资源`）；
    - **选择文件夹（SAF 授权）**：直接授权读取整个工程目录；
    - **载入内置 Demo**：一键体验；
    > 导入文件夹 / zip 工程时会**先清理私有目录里该工程的上次缓存**（旧源码、旧的
    > `bin.elf`、`.tmp` 中间产物）再复制 / 解压，避免新旧文件混杂导致编译异常；
+   >
+   > **zip 安全校验**（SAF 导入与 zip 关联打开共用，`Util.unzip`）：
+   > - 防路径穿越（zip-slip）：解压路径 canonical 必须位于目标目录内，`../` 等非法路径直接拒绝
+   >   （Android 下符号链接条目只会被解压为普通文本文件，不会创建真实链接，无额外风险）；
+   > - 防压缩炸弹：条目数上限 10000、单文件上限 128MB、解压后总量上限 512MB，超限中止并报错；
 3. 点击 **编译 bin.elf**（首次会自动解压约 26MB gcc 工具链，耗时数十秒到数分钟）；
    编译前会弹出**入口文件选择菜单**（默认选中智能判断的 main.c / 含 main 的 .c，可改选）；
 4. 编译通过后点击 **打包 .mrp**，填写元信息、勾选资源文件；
@@ -187,7 +233,7 @@ MrpBuilderAndroid/
 │       │   ├── demo/                # 内置 mrp_demo（helloworld.c + src + assets）
 │       │   └── runtime/mrp_compat.c # -nostdlib 下的 libc/libm 兼容实现（弱符号）
 │       └── java/net/gddhy/mrpbuilder/
-│           ├── MainActivity.java    # UI：选源 / 入口选择 / 编译 / 打包 / 日志复制 / 保存 / 运行 / 分享
+│           ├── MainActivity.java    # UI：选源 / zip 关联打开 / 入口选择 / 编译 / 打包 / 日志复制 / 保存 / 运行 / 分享
 │           ├── Project.java         # 工程模型与扫描（gcc/老 SDK 工程检测、入口智能判断）
 │           ├── ProjectImporter.java # SAF 导入（文件/zip/目录/内置 Demo，导入前清缓存）
 │           ├── ToolchainManager.java# 工具链解压与 chmod

@@ -31,6 +31,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -58,6 +59,13 @@ public class MainActivity extends Activity {
     private File binElf;
     private boolean busy;
 
+    // API 编译服务（静态持有：Activity 重建（旋转等）后仍能控制）
+    private static MrpHttpServer sApiServer;
+    private static ApiCompiler sApiCompiler;
+    private static final int API_PORT = 8111;
+    private TextView tvApiStatus, tvApiUrl;
+    private Button btnApiStart, btnApiStop;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -79,6 +87,21 @@ public class MainActivity extends Activity {
         Button btnExportDemo = findViewById(R.id.btnExportDemo);
         Button btnCopyLog = findViewById(R.id.btnCopyLog);
         Button btnClearLog = findViewById(R.id.btnClearLog);
+        tvApiStatus = findViewById(R.id.tvApiStatus);
+        tvApiUrl = findViewById(R.id.tvApiUrl);
+        btnApiStart = findViewById(R.id.btnApiStart);
+        btnApiStop = findViewById(R.id.btnApiStop);
+
+        btnApiStart.setOnClickListener(v -> startApiServer());
+        btnApiStop.setOnClickListener(v -> stopApiServer());
+        if (sApiServer != null && sApiServer.isRunning()) {
+            btnApiStart.setEnabled(false);
+            btnApiStop.setEnabled(true);
+            tvApiStatus.setText("服务已启动，监听 " + API_PORT + " 端口");
+            tvApiUrl.setText("http://" + ApiHandler.serviceIp(this) + ":" + API_PORT + "/");
+        } else {
+            btnApiStop.setEnabled(false);
+        }
 
         btnFile.setOnClickListener(v -> pickFile());
         btnFolder.setOnClickListener(v -> pickFolder());
@@ -106,6 +129,116 @@ public class MainActivity extends Activity {
         appendLog("MRP Builder 就绪。");
         appendLog("设备 ABI: " + ToolchainManager.abi());
         appendLog("提示：点击「载入内置 Demo」可快速体验编译 + 打包全流程。");
+
+        // 外部 zip 关联打开（文件管理器选择「用 MRP Builder 打开」）：冷启动时在这里处理
+        handleViewIntent(getIntent());
+    }
+
+    /** singleTop 下外部再次用 zip 打开时走这里（Activity 已在前台） */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleViewIntent(intent);
+    }
+
+    /**
+     * 处理外部 zip 打开：文件管理器 / 浏览器携带 zip（ACTION_VIEW + content/file uri）启动本应用时，
+     * 自动解压 zip 到私有目录并准备编译任务，等同于在「选择文件」里选择 .zip 包。
+     * 解压与安全校验（路径穿越 / 符号链接 / 压缩炸弹）在 Util.unzip 内完成。
+     */
+    private void handleViewIntent(Intent intent) {
+        if (intent == null) return;
+        if (!Intent.ACTION_VIEW.equals(intent.getAction())) return;
+        Uri uri = intent.getData();
+        if (uri == null) return;
+        String mime = intent.getType();
+        String name = ProjectImporter.queryName(this, uri);
+        String lower = name == null ? "" : name.toLowerCase(Locale.US);
+        boolean isZip = lower.endsWith(".zip")
+                || (mime != null && mime.toLowerCase(Locale.US).contains("zip"));
+        if (!isZip) return; // 非 zip 关联（如单个 .c 文件被转发），保持正常启动
+        if (busy) {
+            appendLog("[提示] 有任务进行中，请等待完成后再试");
+            return;
+        }
+        appendLog("检测到 zip 文件打开：" + (name != null ? name : uri.toString()));
+        final Uri fUri = uri;
+        runAsync(() -> {
+            try {
+                appendLog("解压 zip 到私有目录并识别工程（含路径穿越 / 压缩炸弹安全校验）…");
+                project = ProjectImporter.importFile(MainActivity.this, fUri, MainActivity.this::appendLog);
+                onProjectReady();
+            } catch (Exception e) {
+                String scheme = fUri.getScheme();
+                appendLog("[错误] 导入失败: " + e.getMessage());
+                if ("file".equalsIgnoreCase(scheme)) {
+                    appendLog("[提示] 该 zip 以 file:// 路径提供，Android 分区存储禁止无权限直接读取。");
+                    appendLog("[提示] 请点击应用内「选择 .c 文件 / .zip 包」，通过系统文件选择器（SAF）导入同一文件。");
+                } else if ("content".equalsIgnoreCase(scheme)) {
+                    appendLog("[提示] 读取失败可能因文件被移动/删除或授权已失效，请重新选择文件导入。");
+                }
+            }
+        });
+    }
+
+    // ---------------------------------------------------------------- API 编译服务
+
+    /** 启动 8111 端口 HTTP 编译服务（本地 + 局域网） */
+    private void startApiServer() {
+        if (sApiServer != null && sApiServer.isRunning()) {
+            toast("编译服务已在运行");
+            return;
+        }
+        runAsync(() -> {
+            try {
+                if (sApiCompiler == null) {
+                    sApiCompiler = new ApiCompiler(this);
+                    sApiCompiler.cleanup();
+                }
+                final MrpHttpServer srv = new MrpHttpServer(API_PORT,
+                        new ApiHandler(this, sApiCompiler),
+                        msg -> appendLog("[API] " + msg));
+                srv.start();
+                sApiServer = srv;
+                final String ip = ApiHandler.serviceIp(this);
+                ui.post(() -> {
+                    btnApiStart.setEnabled(false);
+                    btnApiStop.setEnabled(true);
+                    tvApiStatus.setText("服务已启动，监听 " + API_PORT + " 端口");
+                    tvApiUrl.setText("http://" + ip + ":" + API_PORT + "/（WebUI /doc/ /SKILL.md）");
+                    toast("编译服务已启动: http://" + ip + ":" + API_PORT + "/");
+                    appendLog("[API] 编译服务已启动: http://" + ip + ":" + API_PORT + "/"
+                            + "（WiFi 局域网可访问；手机流量下用 127.0.0.1）");
+                });
+            } catch (java.net.BindException e) {
+                ui.post(() -> {
+                    tvApiStatus.setText("服务未启动");
+                    toast("端口 " + API_PORT + " 被占用，无法启用编译服务");
+                    appendLog("[API] 启动失败：端口 " + API_PORT + " 被占用，无法启用");
+                });
+            } catch (Exception e) {
+                ui.post(() -> {
+                    tvApiStatus.setText("服务未启动");
+                    toast("服务启动失败: " + e.getMessage());
+                    appendLog("[API] 启动失败: " + e.getMessage());
+                });
+            }
+        });
+    }
+
+    private void stopApiServer() {
+        runAsync(() -> {
+            if (sApiServer != null) sApiServer.stop();
+            sApiServer = null;
+            ui.post(() -> {
+                btnApiStart.setEnabled(true);
+                btnApiStop.setEnabled(false);
+                tvApiStatus.setText("服务未启动");
+                tvApiUrl.setText("");
+                appendLog("[API] 编译服务已停止");
+            });
+        });
     }
 
     // ---------------------------------------------------------------- 工具链

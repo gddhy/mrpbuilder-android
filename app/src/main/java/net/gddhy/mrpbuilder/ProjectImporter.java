@@ -9,7 +9,6 @@ import android.provider.OpenableColumns;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.util.zip.ZipInputStream;
 
 /** 通过 SAF 导入工程：单个文件 / zip 包 / 目录授权 / 内置 Demo */
 public final class ProjectImporter {
@@ -46,6 +45,18 @@ public final class ProjectImporter {
         return name == null ? "project" : name;
     }
 
+    /** 目录内文件数（含子目录，递归） */
+    private static int countFiles(File dir) {
+        int n = 0;
+        File[] kids = dir.listFiles();
+        if (kids == null) return 0;
+        for (File f : kids) {
+            if (f.isDirectory()) n += countFiles(f);
+            else n++;
+        }
+        return n;
+    }
+
     private static String safeName(String s) {
         String t = s.replaceAll("[\\\\/:*?\"<>|\\s]+", "_");
         if (t.length() > 40) t = t.substring(t.length() - 40);
@@ -69,20 +80,39 @@ public final class ProjectImporter {
         String name = queryName(ctx, uri);
         log.log("导入: " + name);
         byte[] bytes = readUri(ctx, uri);
+        log.log("已读取 " + Util.humanSize(bytes.length) + "（" + bytes.length + " 字节）");
+        if (bytes.length == 0) {
+            throw new Exception("读取到 0 字节，所选文件可能为空、已损坏或传输不完整");
+        }
         File dir = newProjectDir(ctx, name, log);
         String lower = name.toLowerCase();
         if (lower.endsWith(".zip")) {
+            // zip 魔数校验：PK\x03\x04（普通）/ PK\x05\x06（空 zip）/ PK\x07\x08（跨卷）
+            if (bytes.length < 4 || bytes[0] != 'P' || bytes[1] != 'K'
+                    || !((bytes[2] == 3 || bytes[2] == 5 || bytes[2] == 7) && bytes[3] == 4)) {
+                throw new Exception("文件头不是 zip 格式（应为 PK 开头），所选文件可能不是有效的 zip 压缩包");
+            }
             File zip = new File(dir, name);
             try (FileOutputStream fos = new FileOutputStream(zip)) {
                 fos.write(bytes);
             }
-            try (ZipInputStream zis = new ZipInputStream(new java.io.BufferedInputStream(
-                    new java.io.FileInputStream(zip)))) {
-                Util.unzip(zis, dir);
-            }
+            // 用 ZipFile（中央目录驱动）解压：兼容 MT 管理器等工具流式写入的 zip，
+            // 不使用 ZipInputStream 以免与 Util 内部包装叠加（双层 ZipInputStream 会读到 0 条目）
+            Util.unzipFile(zip, dir);
             //noinspection ResultOfMethodCallIgnored
             zip.delete();
             flattenSingleRoot(dir);
+            int n = countFiles(dir);
+            log.log("解压完成，共 " + n + " 个文件");
+            if (n == 0) {
+                File[] kids = dir.listFiles();
+                StringBuilder sb = new StringBuilder("zip 解压后没有解出任何文件（目录内 ").append(
+                        kids == null ? 0 : kids.length).append(" 项），压缩包可能损坏或为空");
+                if (kids != null) {
+                    for (File f : kids) sb.append("; ").append(f.getName());
+                }
+                throw new Exception(sb.toString());
+            }
             log.log("已解压 zip 到 " + dir.getAbsolutePath());
             Project p = Project.scan(dir);
             logProject(log, p);
@@ -264,7 +294,7 @@ public final class ProjectImporter {
         }
     }
 
-    private static void flattenSingleRoot(File dir) {
+    public static void flattenSingleRoot(File dir) {
         File[] kids = dir.listFiles();
         if (kids != null && kids.length == 1 && kids[0].isDirectory()) {
             File sub = kids[0];

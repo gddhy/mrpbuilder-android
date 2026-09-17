@@ -93,6 +93,59 @@
                 android:text="@string/no_project" />
         </LinearLayout>
 
+        <!-- API 编译服务 -->
+        <TextView
+            style="@style/MrpSectionTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="API 编译服务" />
+
+        <LinearLayout
+            style="@style/MrpCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvApiStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="@color/text_primary"
+                android:text="服务未启动" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnApiStart"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="启动编译服务" />
+
+                <Button
+                    android:id="@+id/btnApiStop"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:text="停止服务" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvApiUrl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:text="" />
+        </LinearLayout>
+
         <!-- 构建 -->
         <TextView
             style="@style/MrpSectionTitle"

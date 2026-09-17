@@ -72,7 +72,7 @@ public final class Project {
 
     /** 不算「资源」的扩展名（与 web 版 NON_RESOURCE_EXT 一致） */
     private static final Set<String> NON_RESOURCE_EXT = new HashSet<>(Arrays.asList(
-            "c", "h", "md", "elf", "o", "obj", "mr", "ext", "json", "txt", "mk"));
+            "c", "h", "md", "elf", "o", "obj", "mr", "ext", "json", "txt", "mk", "mpr"));
 
     private Project() {}
 
@@ -113,8 +113,16 @@ public final class Project {
         for (File f : p.sources) {
             if (fileContains(f, probe)) { p.hasRuntime = true; break; }
         }
+        // 老 SDK（ADS1.2 + SkySDK）工程标志：SkySDK 工程配置文件 *.mpr
+        // （如 MrpBuilder.mpr）。存在即视为 armcc 老工程，不支持 gcc 编译。
+        boolean hasMprConfig = false;
+        for (File f : all) {
+            if (f.getName().toLowerCase().endsWith(".mpr")) { hasMprConfig = true; break; }
+        }
         if (p.hasRuntime) {
             p.runtimeMode = RT_FULL;
+        } else if (hasMprConfig) {
+            p.runtimeMode = RT_PARTIAL;
         } else {
             // 自带部分运行时：无 _start，但自带 mrc_*/xl_*/mpc/uc3_ 等 mythroad 子集
             // （老 SDK 工程，如「合成大金鱼」——自己实现了 mrc_graphics/uc3_font 等）
